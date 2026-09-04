@@ -128,24 +128,24 @@ class Qwen2VLTool(BaseTool):
     def __init__(self, adapter):
         definition = ToolDefinition(
             tool_id="visual_language_specialist",
-            name="Visual Language Specialist (Qwen)",
-            description="General purpose visual understanding, VQA, and captioning.",
-            task_capabilities=["vqa", "captioning", "image_understanding"],
+            name="Visual Language Specialist (Qwen2-VL)",
+            description="Remote-sensing visual understanding, VQA, and captioning. Uses Qwen2-VL-2B with optional RS LoRA adapter.",
+            task_capabilities=["vqa", "captioning", "image_understanding", "rs_interpretation"],
             accepted_modalities=[AssetModality.RGB, AssetModality.MULTISPECTRAL],
             required_capabilities=[],
             output_schema={"type": "object", "properties": {"answer": {"type": "string"}}},
-            version="1.0.0"
+            version="1.1.0"
         )
         super().__init__(definition)
         self.adapter = adapter
-        
+
     def execute(self, request: ToolRequest, assets: List[ImageAsset]) -> ToolResult:
         if not assets:
             return ToolResult(request_id=request.request_id, tool_id=self.definition.tool_id, tool_version=self.definition.version,
                               success=False, execution_duration_sec=0, error_code=ToolErrorCode.INPUT_INVALID, error_message="No assets provided")
-        
+
         asset = assets[0]
-        
+
         if not self.adapter.model:
             try:
                 self.adapter.load()
@@ -192,21 +192,28 @@ class Qwen2VLTool(BaseTool):
                     img = Image.fromarray(b1_norm).convert("RGB")
                     
             # Pass to adapter
-            query = request.parameters.get("query", "Describe this image in detail.")
+            query = request.parameters.get("query", "Describe this remote-sensing image in detail.")
             predictions = self.adapter.predict({"image": img, "query": query})
-            
+
+            inference_mode = predictions.get("inference_mode", "Qwen2-VL-2B base")
+            prov = predictions.get("provenance", ["Qwen2VLAdapter"])
+
             return ToolResult(
                 request_id=request.request_id,
                 tool_id=self.definition.tool_id,
                 tool_version=self.definition.version,
                 success=True,
                 execution_duration_sec=0.0,
-                outputs={"answer": predictions["answer"]},
+                outputs={
+                    "answer": predictions["answer"],
+                    "model": inference_mode,
+                    "adapter_loaded": predictions.get("adapter_loaded", False)
+                },
                 metrics={},
-                provenance=["Qwen2VLAdapter"],
-                confidence={"MODEL_CONFIDENCE": -1.0} # Qwen typically doesn't return raw confidence easily in this wrapper
+                provenance=prov,
+                confidence={"MODEL_CONFIDENCE": -1.0}
             )
-            
+
         except Exception as e:
             return ToolResult(
                 request_id=request.request_id, tool_id=self.definition.tool_id, tool_version=self.definition.version,

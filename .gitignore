@@ -5,6 +5,13 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 backend/models/
+backend/models_fallback/
+backend/data/rs_adaptation/raw/
+backend/data/rs_adaptation/processed/
+backend/data/rs_adaptation/train/
+backend/data/rs_adaptation/validation/
+backend/e2e_artifacts/
+backend/dummy_test.jpg
 
 # Local environments and secrets
 .venv/

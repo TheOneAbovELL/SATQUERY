@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Any, List
 from app.domain.models import ModelAdapterDefinition, AssetModality, ToolRequest, ToolResult, ImageAsset, ToolDefinition, ToolErrorCode
 from app.agent.interfaces import BaseModelAdapter, BaseTool
@@ -78,10 +79,13 @@ class SceneClassificationTool(BaseTool):
 
 class Qwen2VLAdapter(BaseModelAdapter):
     """
-    PRIMARY LOCAL MODEL
-    Qwen2-VL-2B-Instruct
-    Chosen because it is only 2B parameters, supports arbitrary image resolutions 
-    (vital for satellite aspect ratios), and fits comfortably in 16GB RAM when running on CPU.
+    PRIMARY LOCAL MODEL: Qwen2-VL-2B-Instruct
+    Supports optional LoRA adapter for remote-sensing domain adaptation.
+
+    Configuration:
+      QWEN_ADAPTER_PATH  env var  → path to trained LoRA adapter directory.
+      If set and valid, loads base + adapter (adapted inference).
+      If absent/invalid, loads base model only (standard inference).
     """
     def __init__(self):
         definition = ModelAdapterDefinition(
@@ -104,64 +108,92 @@ class Qwen2VLAdapter(BaseModelAdapter):
         super().__init__(definition)
         self.model = None
         self.processor = None
-        
+        self.adapter_path: str = os.environ.get("QWEN_ADAPTER_PATH", "")
+        self.adapter_loaded: bool = False
+        self._adaptation_meta: Dict[str, Any] = {}
+
+    @property
+    def inference_mode(self) -> str:
+        if self.adapter_loaded:
+            return "Qwen2-VL-2B + remote-sensing LoRA adapter"
+        return "Qwen2-VL-2B base"
+
     def load(self):
         try:
             from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
             import torch
-            
-            # Using CPU-safe dtype if CUDA is unavailable
+
+            dtype = torch.bfloat16
             self.processor = AutoProcessor.from_pretrained(
-                self.definition.model_id, 
-                cache_dir="./models"
+                self.definition.model_id, cache_dir="./models"
             )
-            self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+            base_model = Qwen2VLForConditionalGeneration.from_pretrained(
                 self.definition.model_id,
-                torch_dtype=torch.bfloat16,
+                torch_dtype=dtype,
                 device_map="cpu",
                 cache_dir="./models"
             )
+
+            # Try to load LoRA adapter
+            if self.adapter_path and os.path.isdir(self.adapter_path):
+                adapter_config = os.path.join(self.adapter_path, "adapter_config.json")
+                if os.path.exists(adapter_config):
+                    try:
+                        from peft import PeftModel
+                        self.model = PeftModel.from_pretrained(base_model, self.adapter_path)
+                        self.adapter_loaded = True
+
+                        # Load training manifest for provenance
+                        manifest_path = os.path.join(self.adapter_path, "training_manifest.json")
+                        if os.path.exists(manifest_path):
+                            import json
+                            self._adaptation_meta = json.loads(
+                                open(manifest_path).read()
+                            )
+                    except Exception as e:
+                        # Adapter load failed — fall back to base model, never crash
+                        import warnings
+                        warnings.warn(f"LoRA adapter load failed ({e}), using base model.")
+                        self.model = base_model
+                        self.adapter_loaded = False
+                else:
+                    self.model = base_model
+            else:
+                self.model = base_model
+
         except ImportError:
             raise ImportError("Qwen2-VL requires `transformers`, `qwen-vl-utils`, and `torch`.")
 
     def unload(self):
         self.model = None
         self.processor = None
-        # Force garbage collection if possible
+        self.adapter_loaded = False
         import gc
         gc.collect()
-        
+
     def predict(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         if not self.model or not self.processor:
             raise RuntimeError("Model not loaded")
-            
+
         from qwen_vl_utils import process_vision_info
-        
-        img = inputs['image'] # PIL Image
+
+        img = inputs['image']
         query_text = inputs['query']
-        
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": img},
-                    {"type": "text", "text": query_text},
-                ],
-            }
-        ]
-        
+
+        messages = [{"role": "user", "content": [
+            {"type": "image", "image": img},
+            {"type": "text", "text": query_text},
+        ]}]
+
         text = self.processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
         image_inputs, video_inputs = process_vision_info(messages)
         model_inputs = self.processor(
-            text=[text],
-            images=image_inputs,
-            videos=video_inputs,
-            padding=True,
-            return_tensors="pt",
+            text=[text], images=image_inputs, videos=video_inputs,
+            padding=True, return_tensors="pt",
         ).to("cpu")
-        
+
         generated_ids = self.model.generate(**model_inputs, max_new_tokens=128)
         generated_ids_trimmed = [
             out_ids[len(in_ids):] for in_ids, out_ids in zip(model_inputs.input_ids, generated_ids)
@@ -169,8 +201,21 @@ class Qwen2VLAdapter(BaseModelAdapter):
         output_text = self.processor.batch_decode(
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
-        
-        return {"answer": output_text[0]}
+
+        # Build provenance
+        prov = [f"inference_mode: {self.inference_mode}"]
+        if self.adapter_loaded and self._adaptation_meta:
+            ds = self._adaptation_meta.get("dataset", {})
+            prov.append(f"adapter_dataset: {ds.get('name', 'unknown')}")
+            prov.append(f"adapter_status: {self._adaptation_meta.get('status', 'unknown')}")
+
+        return {
+            "answer": output_text[0],
+            "inference_mode": self.inference_mode,
+            "adapter_loaded": self.adapter_loaded,
+            "provenance": prov
+        }
+
 
 class Moondream2Adapter(BaseModelAdapter):
     """

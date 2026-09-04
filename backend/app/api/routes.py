@@ -6,7 +6,10 @@ from app.agent.registry import ToolRegistry
 from app.agent.execution import ToolExecutionService
 from app.agent.orchestrator import SatQueryAgent
 from app.agent.providers import DummyLLMProvider, AgentExecutionPlan, AgentPlanStep
-from app.analytics.tools import NdviTool, AreaTool
+from app.analytics.tools import NdviTool, AreaTool, Qwen2VLTool
+from app.analytics.change_tools import BiTemporalChangeTool
+from app.analytics.sar_tools import SARAnalysisTool
+from app.analytics.fusion_tools import CrossModalEvidenceTool
 
 router = APIRouter()
 
@@ -15,6 +18,9 @@ def get_satquery_agent():
     registry = ToolRegistry()
     registry.register(NdviTool())
     registry.register(AreaTool())
+    registry.register(BiTemporalChangeTool())
+    registry.register(SARAnalysisTool())
+    registry.register(CrossModalEvidenceTool())
     
     execution_service = ToolExecutionService(registry)
     

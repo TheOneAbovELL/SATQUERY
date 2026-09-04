@@ -52,6 +52,7 @@ class InputValidator:
                     result["resolution"] = (abs(src.transform.a), abs(src.transform.e))
                     b = src.bounds
                     result["geospatial_bounds"] = {"min_x": b.left, "min_y": b.bottom, "max_x": b.right, "max_y": b.top}
+                    result["capabilities"]["can_change_analysis"] = True
                     if src.crs.is_projected:
                         result["capabilities"]["can_area_measurement"] = True
                     else:
@@ -60,12 +61,31 @@ class InputValidator:
                     result["warnings"].append("No CRS found. Geospatial capabilities disabled.")
                 
                 semantics = {}
-                for i in range(1, src.count + 1):
-                    ci = src.colorinterp[i-1].name.upper()
-                    if ci not in ["UNDEFINED", "UNSUPPORTED"]:
-                        semantics[i] = ci
+                is_sar = False
                 
-                if src.count == 1:
+                # Check tags for SAR hints
+                tags = src.tags()
+                tags_upper = {k.upper(): v.upper() if isinstance(v, str) else str(v).upper() for k, v in tags.items()}
+                if "SAR" in tags_upper.get("SENSOR", "") or "SENTINEL-1" in tags_upper.get("SENSOR", ""):
+                    is_sar = True
+                
+                for i in range(1, src.count + 1):
+                    # Check description first for polarization
+                    desc = src.descriptions[i-1]
+                    if desc and desc.upper() in ["VV", "VH", "HH", "HV"]:
+                        semantics[i] = desc.upper()
+                        is_sar = True
+                    else:
+                        ci = src.colorinterp[i-1].name.upper()
+                        if ci not in ["UNDEFINED", "UNSUPPORTED"]:
+                            semantics[i] = ci
+                
+                if is_sar:
+                    result["modality"] = AssetModality.SAR
+                    if not semantics: 
+                        # Fallback if unlabelled but marked as SAR
+                        semantics[1] = "AMPLITUDE"
+                elif src.count == 1:
                     result["modality"] = AssetModality.GRAYSCALE
                     if not semantics: semantics[1] = "GRAY"
                 elif src.count == 3:

@@ -144,6 +144,9 @@ class ToolErrorCode(str, Enum):
     TIMEOUT = "TIMEOUT"
     OUTPUT_INVALID = "OUTPUT_INVALID"
     ARTIFACT_FAILURE = "ARTIFACT_FAILURE"
+    NO_SPATIAL_OVERLAP = "NO_SPATIAL_OVERLAP"
+    INSUFFICIENT_VALID_DATA = "INSUFFICIENT_VALID_DATA"
+    CAPABILITY_UNAVAILABLE = "CAPABILITY_UNAVAILABLE"
     NONE = "NONE"
 
 class ToolRequest(BaseModel):
@@ -200,4 +203,23 @@ class AgentExecutionPlan(BaseModel):
     intent: str
     steps: List[AgentPlanStep]
 
+class EvidenceRelationship(str, Enum):
+    AGREEMENT = "AGREEMENT"
+    DISAGREEMENT = "DISAGREEMENT"
+    COMPLEMENTARY = "COMPLEMENTARY"
+    INCONCLUSIVE = "INCONCLUSIVE"
+    FUSION_UNAVAILABLE = "FUSION_UNAVAILABLE"
 
+class EvidenceQuality(BaseModel):
+    spatial_overlap_quality: str
+    temporal_consistency: str
+    data_validity: str
+    score_components: Dict[str, float] = {}
+
+class EvidenceItem(BaseModel):
+    modality: AssetModality
+    observation: str
+    metrics: Dict[str, Any]
+    spatial_artifacts: List[Dict[str, Any]] = []
+    source_tool: str
+    provenance: List[str]

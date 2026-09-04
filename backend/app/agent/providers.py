@@ -34,22 +34,89 @@ class GeminiProvider(BaseLLMProvider):
     Integration for Google Gemini via structured prompt.
     Requires GEMINI_API_KEY environment variable.
     """
-    def __init__(self, model_name="gemini-pro"):
+    def __init__(self, model_name: str = "gemini-1.5-flash"):
+        import google.generativeai as genai
         self.api_key = os.environ.get("GEMINI_API_KEY")
-        self.model_name = model_name
-        
-    def generate_plan(self, query: str, context: str, available_tools: List[ToolDefinition]) -> AgentExecutionPlan:
         if not self.api_key:
-            # Fallback for testing environments without keys
-            raise RuntimeError("GEMINI_API_KEY is not configured.")
-            
-        # In a real environment with google-genai, we would use structured generation here.
-        # e.g., model.generate_content(prompt, response_schema=AgentExecutionPlan)
-        # For now, we simulate the interface.
-        raise NotImplementedError("Live Gemini integration requires SDK installation.")
+            raise RuntimeError("GEMINI_API_KEY environment variable is not set.")
+        genai.configure(api_key=self.api_key)
+        self.model = genai.GenerativeModel(model_name)
+
+    def generate_plan(self, query: str, context: str, available_tools: List[ToolDefinition]) -> AgentExecutionPlan:
+        tool_descriptions = "\n".join(
+            f"- tool_id: {t.tool_id} | {t.description} | capabilities: {t.task_capabilities}"
+            for t in available_tools
+        )
+        
+        prompt = f"""You are SatQuery, a geospatial AI analyst. Given a user query and a set of available tools, produce a JSON execution plan.
+
+Available tools:
+{tool_descriptions}
+
+User query: {query}
+
+Asset context: {context}
+
+IMPORTANT RULES:
+- Only select tools from the list above.
+- Return ONLY valid JSON matching this schema exactly, no markdown fences:
+{{"intent": "<purpose>", "steps": [{{"tool_id": "<id>", "input_asset_ids": ["<id>"], "parameters": {{}}, "purpose": "<why>"}}]}}
+- Do not hallucinate tool_ids.
+- If no tool is appropriate, return an empty steps array."""
+
+        try:
+            response = self.model.generate_content(prompt)
+            raw = response.text.strip()
+            # Strip markdown code fences if present
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            plan_data = json.loads(raw.strip())
+            steps = []
+            for s in plan_data.get("steps", []):
+                steps.append(AgentPlanStep(
+                    tool_id=s["tool_id"],
+                    input_asset_ids=s.get("input_asset_ids", []),
+                    parameters=s.get("parameters", {}),
+                    purpose=s.get("purpose", "")
+                ))
+            return AgentExecutionPlan(intent=plan_data.get("intent", query), steps=steps)
+        except Exception as e:
+            return AgentExecutionPlan(intent=f"Plan parse error: {e}", steps=[])
 
     def synthesize_answer(self, query: str, tool_results: List[ToolResult]) -> str:
-        if not self.api_key:
-            raise RuntimeError("GEMINI_API_KEY is not configured.")
-            
-        raise NotImplementedError("Live Gemini integration requires SDK installation.")
+        evidence_summary = []
+        for res in tool_results:
+            if res.success:
+                evidence_summary.append(
+                    f"Tool '{res.tool_id}': outputs={res.outputs}, metrics={res.metrics}, "
+                    f"regions={len(res.spatial_artifacts)}, provenance={res.provenance[:3]}"
+                )
+            else:
+                evidence_summary.append(
+                    f"Tool '{res.tool_id}' FAILED: {res.error_code} — {res.error_message}"
+                )
+        
+        evidence_text = "\n".join(evidence_summary) if evidence_summary else "No tools executed."
+        
+        prompt = f"""You are SatQuery, a geospatial AI analyst.
+
+User query: {query}
+
+Tool evidence (all deterministic, do not modify these numbers):
+{evidence_text}
+
+RULES:
+1. Synthesize a clear, concise answer grounded ONLY in the tool evidence above.
+2. Do NOT invent numbers. Use only the values from the evidence.
+3. Distinguish what is measured from what is uncertain.
+4. Use scientific language. Never say "proves" or "confirms" without caveats.
+5. Keep the answer under 200 words."""
+
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            return f"Synthesis failed: {str(e)}. Raw evidence: {evidence_text[:500]}"
+

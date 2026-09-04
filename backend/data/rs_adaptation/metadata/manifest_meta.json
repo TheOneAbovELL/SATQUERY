@@ -1,0 +1,11 @@
+{
+  "dataset_name": "UCM-Captions",
+  "source": "https://github.com/201528014227051/RSICD_optimal",
+  "license": "CC BY-NC-SA 4.0",
+  "modality": "optical_aerial",
+  "total_samples": 5,
+  "train_samples": 4,
+  "validation_samples": 1,
+  "seed": 42,
+  "prepared_at": "2026-09-04T22:25:23.829547+00:00"
+}
