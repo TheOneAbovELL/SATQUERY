@@ -1,0 +1,25 @@
+# Python generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/models/
+
+# Local environments and secrets
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+frontend/.vercel/
+frontend/*.tsbuildinfo
+
+# Local backup of the frontend repository metadata
+frontend.git.backup/
