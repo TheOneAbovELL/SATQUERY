@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
@@ -7,29 +8,26 @@
   /* ── SATQUERY Design Tokens ── */
 
   /* Backgrounds */
-  --color-sq-bg:        #070c14;
-  --color-sq-surface:   #0d1626;
-  --color-sq-surface-2: #111d30;
-  --color-sq-surface-3: #162035;
+  --color-sq-bg:        #000000;
+  --color-sq-surface:   #09090b;
+  --color-sq-surface-2: #121214;
+  --color-sq-surface-3: #18181b;
 
   /* Borders */
-  --color-sq-border:    #1e2d42;
-  --color-sq-border-2:  #243450;
+  --color-sq-border:    #27272a;
+  --color-sq-border-2:  #3f3f46;
 
-  /* Accent (active / AI) */
-  --color-sq-accent:    #00b4d8;
-  --color-sq-accent-dim:#0077a8;
+  /* Brand / Accents */
+  --color-sq-accent:    #ffffff;
+  --color-sq-optical:   #4ade80;
+  --color-sq-sar:       #f59e0b;
+  --color-sq-change:    #f43f5e;
+  --color-sq-fusion:    #a78bfa;
 
-  /* Modality colours */
-  --color-sq-optical:   #4ade80;   /* green — optical evidence */
-  --color-sq-sar:       #f59e0b;   /* amber — SAR evidence */
-  --color-sq-change:    #f43f5e;   /* rose  — change detection */
-  --color-sq-fusion:    #a78bfa;   /* violet — cross-modal fusion */
-
-  /* Text */
-  --color-sq-text:      #dde6f0;
-  --color-sq-muted:     #64748b;
-  --color-sq-subtle:    #3d5166;
+  /* Typography */
+  --color-sq-text:      #f4f4f5;
+  --color-sq-muted:     #a1a1aa;
+  --color-sq-subtle:    #52525b;
 
   /* Status */
   --color-sq-ok:        #22c55e;

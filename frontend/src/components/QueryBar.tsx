@@ -7,14 +7,17 @@ export function QueryBar() {
   const { state, dispatch } = useWorkspace();
   const [input, setInput] = useState("");
 
+  const isBusy = ["submitting", "validating", "planning", "analyzing", "synthesizing"].includes(state.phase);
+
   const handleSubmit = async () => {
-    if (!input.trim() || state.phase !== "idle") return;
+    if (!input.trim() || isBusy) return;
     dispatch({ type: "SET_QUERY", payload: input });
     dispatch({ type: "SET_PHASE", payload: "submitting" });
     try {
       const assetIds = state.scenes.map(s => s.asset.asset_id);
       const result = await analyze(input, assetIds);
       dispatch({ type: "SET_RESULT", payload: result });
+      setInput(""); // clear input for next query
     } catch (e) {
       dispatch({ type: "SET_ERROR", payload: String(e) });
     }
@@ -29,17 +32,17 @@ export function QueryBar() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="Ask SatQuery anything about this scene..."
-          className="flex-1 px-4 py-3 rounded-lg text-sm outline-none"
+          className="flex-1 px-4 py-3 rounded-lg text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--color-sq-accent)]"
           style={{ background: "var(--color-sq-surface-2)", border: "1px solid var(--color-sq-border)", color: "var(--color-sq-text)" }}
-          disabled={state.phase !== "idle"}
+          disabled={isBusy}
         />
         <button
           onClick={handleSubmit}
-          disabled={state.phase !== "idle"}
-          className="px-6 py-3 rounded-lg text-sm font-bold transition-colors"
-          style={{ background: state.phase !== "idle" ? "var(--color-sq-border-2)" : "var(--color-sq-accent)", color: "var(--color-sq-bg)" }}
+          disabled={isBusy}
+          className="px-6 py-3 rounded-lg text-sm font-bold transition-colors shadow-lg"
+          style={{ background: isBusy ? "var(--color-sq-border-2)" : "var(--color-sq-accent)", color: "var(--color-sq-bg)" }}
         >
-          {state.phase !== "idle" ? "ANALYZING..." : "ANALYZE"}
+          {isBusy ? "ANALYZING..." : "ANALYZE"}
         </button>
       </div>
     </div>

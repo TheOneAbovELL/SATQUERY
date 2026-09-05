@@ -161,8 +161,14 @@ class HeuristicLLMProvider(BaseLLMProvider):
                 steps.append(AgentPlanStep(tool_id="cross_modal_evidence", input_asset_ids=a_ids, purpose="Cross-modal synthesis", parameters={"optical_t1_id": opt_id, "optical_t2_id": opt_id, "sar_t1_id": sar_id, "sar_t2_id": sar_id}))
                 intent = "Optical + SAR cross-modal analysis"
             else:
-                steps.append(AgentPlanStep(tool_id="bi_temporal_change_analysis", input_asset_ids=a_ids, purpose="Analyze temporal change", parameters={"t1_asset_id": a_ids[0], "t2_asset_id": a_ids[1]}))
-                intent = "Bi-temporal change detection"
+                # Use the VLM for qualitative change detection (it will stitch them side-by-side)
+                steps.append(AgentPlanStep(
+                    tool_id="visual_language_specialist", 
+                    input_asset_ids=a_ids, 
+                    purpose="Analyze temporal change qualitatively", 
+                    parameters={"query": query}
+                ))
+                intent = "Bi-temporal qualitative change detection"
                 
         return AgentExecutionPlan(intent=intent, steps=steps)
 

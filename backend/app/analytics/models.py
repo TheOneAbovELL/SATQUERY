@@ -180,13 +180,100 @@ class Qwen2VLAdapter(BaseModelAdapter):
         gc.collect()
 
     def predict(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        import os
+        import re
+        import json
+        import base64
+        import io
+        import requests
+        from PIL import Image
+
+        img: Image.Image = inputs['image']
+        query_text = inputs.get('query', 'Describe this remote-sensing image in detail.')
+
+        # 1. High-Speed Cloud LPU Engine (Groq Vision) if GROQ_API_KEY is set
+        groq_api_key = os.environ.get("GROQ_API_KEY")
+        if not groq_api_key and os.path.exists(".env"):
+            try:
+                with open(".env", "r") as f:
+                    for line in f:
+                        if line.startswith("GROQ_API_KEY="):
+                            groq_api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+            except Exception:
+                pass
+
+        if groq_api_key:
+            try:
+                # Resize and compress to JPEG for fast transport
+                img_copy = img.copy()
+                img_copy.thumbnail((384, 384), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                img_copy.save(buf, format="JPEG", quality=75)
+                b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+                system_prompt = (
+                    "You are SatQuery AI, an expert multimodal remote-sensing vision-language assistant for ISRO / Department of Space. "
+                    "Provide a direct, thorough, scientifically rigorous, and detailed analysis of this satellite scene. "
+                    "Do NOT include internal monologue or <think> tags. Directly output your expert analysis. "
+                    "Identify terrain types, vegetation density, hydrological features, coastal geography, and urban infrastructure if visible. "
+                    "CRITICAL RULE: NEVER guess, name, or hallucinate specific real-world locations, cities, countries, or airports (e.g., do not say 'Tokyo' or 'Haneda'). Focus ONLY on describing the observable physical geography and infrastructure. "
+                    "Keep the final synthesized summary direct, authoritative, and structured."
+                )
+
+                payload = {
+                    "model": "qwen/qwen3.6-27b",
+                    "max_tokens": 500,
+                    "temperature": 0.2,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": f"Analyze this remote sensing scene in detail for query: {query_text}. Give a direct, comprehensive report."},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_str}"}}
+                            ]
+                        }
+                    ]
+                }
+
+                headers = {
+                    "Authorization": f"Bearer {groq_api_key}",
+                    "Content-Type": "application/json"
+                }
+
+                resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
+                if resp.status_code == 200:
+                    raw_text = resp.json()["choices"][0]["message"]["content"]
+                    # Strip reasoning tags if present
+                    if "</think>" in raw_text:
+                        clean_text = raw_text.split("</think>", 1)[1].strip()
+                    elif "<think>" in raw_text:
+                        clean_text = re.sub(r"<think>.*", "", raw_text, flags=re.DOTALL).strip()
+                    else:
+                        clean_text = raw_text.strip()
+
+                    if not clean_text:
+                        clean_text = raw_text.replace("<think>", "").replace("</think>", "").strip()
+
+                    return {
+                        "answer": clean_text,
+                        "inference_mode": "Qwen-27B Vision (Groq LPU Cloud Acceleration)",
+                        "adapter_loaded": True,
+                        "provenance": ["GroqCloudLPU", "Qwen-27B-Vision"]
+                    }
+            except Exception as e:
+                print(f"[!] Groq Vision failed, falling back to local model: {e}")
+
+        # 2. Local Fallback Execution
         if not self.model or not self.processor:
-            raise RuntimeError("Model not loaded")
+            self.load()
 
         from qwen_vl_utils import process_vision_info
 
-        img = inputs['image']
-        query_text = inputs['query']
+        max_dim = 384
+        if img.width > max_dim or img.height > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
         messages = [{"role": "user", "content": [
             {"type": "image", "image": img},
@@ -202,15 +289,14 @@ class Qwen2VLAdapter(BaseModelAdapter):
             padding=True, return_tensors="pt",
         ).to("cpu")
 
-        generated_ids = self.model.generate(**model_inputs, max_new_tokens=128)
+        generated_ids = self.model.generate(**model_inputs, max_new_tokens=150)
         generated_ids_trimmed = [
             out_ids[len(in_ids):] for in_ids, out_ids in zip(model_inputs.input_ids, generated_ids)
         ]
         output_text = self.processor.batch_decode(
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )
+        )[0]
 
-        # Build provenance
         prov = [f"inference_mode: {self.inference_mode}"]
         if self.adapter_loaded and self._adaptation_meta:
             ds = self._adaptation_meta.get("dataset", {})
@@ -218,7 +304,7 @@ class Qwen2VLAdapter(BaseModelAdapter):
             prov.append(f"adapter_status: {self._adaptation_meta.get('status', 'unknown')}")
 
         return {
-            "answer": output_text[0],
+            "answer": output_text,
             "inference_mode": self.inference_mode,
             "adapter_loaded": self.adapter_loaded,
             "provenance": prov

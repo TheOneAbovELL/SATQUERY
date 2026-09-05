@@ -14,11 +14,13 @@ export default function SatQueryAI() {
         <Header />
         <div className="flex flex-1 overflow-hidden">
           <ScenePanel />
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <ImageCanvas />
+          <div className="flex flex-col flex-1 overflow-hidden relative">
+            <AnalysisPanel />
             <QueryBar />
           </div>
-          <AnalysisPanel />
+          <div className="w-[450px] shrink-0 border-l flex flex-col" style={{ borderColor: "var(--color-sq-border)" }}>
+            <ImageCanvas />
+          </div>
         </div>
       </div>
     </WorkspaceProvider>

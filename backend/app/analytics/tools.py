@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 import rasterio
 import numpy as np
+import os
 from app.domain.models import ToolDefinition, AssetModality, ToolRequest, ToolResult, ImageAsset, ToolErrorCode
 from app.agent.interfaces import BaseTool
 from app.analytics.deterministic import DeterministicAnalyticsEngine
@@ -144,9 +145,9 @@ class Qwen2VLTool(BaseTool):
             return ToolResult(request_id=request.request_id, tool_id=self.definition.tool_id, tool_version=self.definition.version,
                               success=False, execution_duration_sec=0, error_code=ToolErrorCode.INPUT_INVALID, error_message="No assets provided")
 
-        asset = assets[0]
+        has_groq = os.environ.get("GROQ_API_KEY") or (os.path.exists(".env") and "GROQ_API_KEY" in open(".env").read())
 
-        if not self.adapter.model:
+        if not has_groq and not self.adapter.model:
             try:
                 self.adapter.load()
             except Exception as e:
@@ -157,43 +158,61 @@ class Qwen2VLTool(BaseTool):
                 
         # Prepare inputs
         try:
-            # Safely create an RGB PIL image from the asset
             import rasterio
-            from PIL import Image
+            from PIL import Image, ImageDraw, ImageFont
             import numpy as np
             
-            # Simple heuristic for RGB extraction
-            with rasterio.open(asset.storage_location) as src:
-                # Assuming bands 1,2,3 are RGB if no semantics, or extracting specific semantics
-                bands = []
-                for color in ["RED", "GREEN", "BLUE"]:
-                    # Find band index
-                    idx = None
-                    for k, v in asset.band_semantics.items():
-                        if v == color:
-                            idx = k
-                            break
-                    if idx is not None:
-                        bands.append(src.read(idx))
+            def load_asset_as_pil(asset: ImageAsset) -> Image.Image:
+                with rasterio.open(asset.storage_location) as src:
+                    bands = []
+                    # Try to use semantics first
+                    for color in ["RED", "GREEN", "BLUE"]:
+                        idx = None
+                        for k, v in asset.band_semantics.items():
+                            if v == color:
+                                idx = k
+                                break
+                        if idx is not None:
+                            bands.append(src.read(idx))
+                            
+                    # If semantics failed but we have 3+ bands, assume 1=R, 2=G, 3=B
+                    if len(bands) < 3 and src.count >= 3:
+                        bands = [src.read(1), src.read(2), src.read(3)]
                         
-                if len(bands) == 3:
-                    # Construct RGB
-                    r, g, b = bands
-                    # Simple normalization to 0-255
-                    r_norm = np.clip((r - r.min()) / (r.max() - r.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
-                    g_norm = np.clip((g - g.min()) / (g.max() - g.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
-                    b_norm = np.clip((b - b.min()) / (b.max() - b.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
-                    rgb_arr = np.stack((r_norm, g_norm, b_norm), axis=-1)
-                    img = Image.fromarray(rgb_arr)
-                else:
-                    # Fallback to just reading first band as Grayscale
-                    b1 = src.read(1)
-                    b1_norm = np.clip((b1 - b1.min()) / (b1.max() - b1.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
-                    img = Image.fromarray(b1_norm).convert("RGB")
-                    
+                    if len(bands) == 3:
+                        r, g, b = bands
+                        r_norm = np.clip((r - r.min()) / (r.max() - r.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
+                        g_norm = np.clip((g - g.min()) / (g.max() - g.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
+                        b_norm = np.clip((b - b.min()) / (b.max() - b.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
+                        rgb_arr = np.stack((r_norm, g_norm, b_norm), axis=-1)
+                        return Image.fromarray(rgb_arr)
+                    else:
+                        b1 = src.read(1)
+                        b1_norm = np.clip((b1 - b1.min()) / (b1.max() - b1.min() + 1e-5) * 255, 0, 255).astype(np.uint8)
+                        return Image.fromarray(b1_norm).convert("RGB")
+
+            images = [load_asset_as_pil(a) for a in assets]
+            
+            if len(images) == 1:
+                final_img = images[0]
+            else:
+                # Stitch images horizontally for Change Detection / Multi-modal
+                target_height = min(img.height for img in images)
+                resized_images = [img.resize((int(img.width * target_height / img.height), target_height)) for img in images]
+                total_width = sum(img.width for img in resized_images)
+                
+                final_img = Image.new('RGB', (total_width, target_height))
+                x_offset = 0
+                for img in resized_images:
+                    final_img.paste(img, (x_offset, 0))
+                    x_offset += img.width
+
             # Pass to adapter
             query = request.parameters.get("query", "Describe this remote-sensing image in detail.")
-            predictions = self.adapter.predict({"image": img, "query": query})
+            if len(images) > 1:
+                query = "The attached image contains two satellite observations of the same location stitched side-by-side (Time 1 on the left, Time 2 on the right). " + query
+
+            predictions = self.adapter.predict({"image": final_img, "query": query})
 
             inference_mode = predictions.get("inference_mode", "Qwen2-VL-2B base")
             prov = predictions.get("provenance", ["Qwen2VLAdapter"])

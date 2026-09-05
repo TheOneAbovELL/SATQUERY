@@ -2,11 +2,20 @@ import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import type { AnalysisResult } from '../types/schema';
 import type { SceneState, WorkspaceMode, AnalysisPhase, ActiveLayer } from '../types/satquery';
 
+interface ConversationItem {
+  id: string;
+  query: string;
+  result: AnalysisResult | null;
+  phase: AnalysisPhase;
+  error: string | null;
+}
+
 interface WorkspaceState {
   scenes: SceneState[];
   workspaceMode: WorkspaceMode;
   query: string;
   phase: AnalysisPhase;
+  history: ConversationItem[]; // NEW: Conversation history
   result: AnalysisResult | null;
   error: string | null;
   activeLayer: ActiveLayer;
@@ -29,6 +38,7 @@ const initialState: WorkspaceState = {
   workspaceMode: 'EMPTY',
   query: '',
   phase: 'idle',
+  history: [], // Initialize history
   result: null,
   error: null,
   activeLayer: 'IMAGE',
@@ -61,12 +71,39 @@ function workspaceReducer(state: WorkspaceState, action: Action): WorkspaceState
       const newScenes = state.scenes.filter(s => s.asset.asset_id !== action.payload);
       return { ...state, scenes: newScenes, workspaceMode: deriveWorkspaceMode(newScenes) };
     }
-    case 'SET_QUERY': return { ...state, query: action.payload };
-    case 'SET_PHASE': return { ...state, phase: action.payload };
-    case 'SET_RESULT': return { ...state, result: action.payload, phase: 'done', error: null };
-    case 'SET_ERROR': return { ...state, error: action.payload, phase: 'failed' };
+    case 'SET_QUERY': {
+      // When a new query is set, we also add a placeholder to history
+      const newItem = { id: Date.now().toString(), query: action.payload, result: null, phase: 'submitting' as AnalysisPhase, error: null };
+      return { ...state, query: action.payload, history: [...state.history, newItem] };
+    }
+    case 'SET_PHASE': {
+      if (state.history.length > 0) {
+        const h = [...state.history];
+        h[h.length - 1].phase = action.payload;
+        return { ...state, phase: action.payload, history: h };
+      }
+      return { ...state, phase: action.payload };
+    }
+    case 'SET_RESULT': {
+      if (state.history.length > 0) {
+        const h = [...state.history];
+        h[h.length - 1].result = action.payload;
+        h[h.length - 1].phase = 'done';
+        return { ...state, result: action.payload, phase: 'done', error: null, history: h };
+      }
+      return { ...state, result: action.payload, phase: 'done', error: null };
+    }
+    case 'SET_ERROR': {
+      if (state.history.length > 0) {
+        const h = [...state.history];
+        h[h.length - 1].error = action.payload;
+        h[h.length - 1].phase = 'failed';
+        return { ...state, error: action.payload, phase: 'failed', history: h };
+      }
+      return { ...state, error: action.payload, phase: 'failed' };
+    }
     case 'SET_ACTIVE_LAYER': return { ...state, activeLayer: action.payload };
-    case 'RESET_ANALYSIS': return { ...state, result: null, error: null, phase: 'idle' };
+    case 'RESET_ANALYSIS': return { ...state, result: null, error: null, phase: 'idle', history: [] };
     default: return state;
   }
 }

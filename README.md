@@ -10,6 +10,8 @@
   <em>Ask questions about satellite imagery in natural language. Get deterministic measurements, visual evidence, model interpretation, and an auditable execution trace.</em>
 </p>
 
+![SatQuery AI system architecture](./SatQuery_AI_Architecture_Diagram%20(1).png)
+
 ---
 
 ## 🚀 At a Glance
