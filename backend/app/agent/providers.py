@@ -145,7 +145,7 @@ class HeuristicLLMProvider(BaseLLMProvider):
                 steps.append(AgentPlanStep(tool_id="visual_language_specialist", input_asset_ids=[a_id], purpose="Extract insights using VLM", parameters={"query": query}))
                 intent = "VLM single-image analysis"
             elif mod == "SAR" or mod == "Grayscale":
-                steps.append(AgentPlanStep(tool_id="sar_analysis", input_asset_ids=[a_id], purpose="Analyze backscatter properties", parameters={}))
+                steps.append(AgentPlanStep(tool_id="sar_analysis", input_asset_ids=[a_id], purpose="Analyze backscatter properties", parameters={"asset_id": a_id}))
                 intent = "SAR analysis"
             else:
                 steps.append(AgentPlanStep(tool_id="ndvi_calculator", input_asset_ids=[a_id], purpose="Fallback analysis", parameters={}))
@@ -177,13 +177,13 @@ class HeuristicLLMProvider(BaseLLMProvider):
         if res.tool_id == "bi_temporal_change_analysis":
             m = res.metrics
             pct = m.get("change_fraction", 0.0) * 100
-            return f"Bi-temporal analysis detected change across {pct:.2f}% of the scene ({m.get('changed_pixels', 0)} pixels changed). {len(res.spatial_artifacts)} distinct change regions were identified."
+            return f"Bi-temporal analysis detected change across {pct:.2f}% of the scene ({int(m.get('changed_pixel_count', 0))} pixels changed). {len(res.spatial_artifacts)} distinct change regions were identified."
             
         if res.tool_id == "cross_modal_evidence":
             return f"Cross-modal synthesis completed. Agreement class: {res.outputs.get('relationship', 'UNKNOWN')}. {res.outputs.get('explanation', '')}"
             
         if res.tool_id == "sar_analysis":
             m = res.metrics
-            return f"SAR analysis identified an average backscatter of {m.get('mean_backscatter', 0.0):.2f} dB, with {m.get('high_scatter_fraction', 0.0)*100:.1f}% high-scatter pixels."
+            return f"SAR analysis identified an average backscatter of {m.get('mean', 0.0):.2f} dB, with a 99th percentile peak of {m.get('p99', 0.0):.2f} dB."
 
         return f"Analysis completed successfully using {res.tool_id}."

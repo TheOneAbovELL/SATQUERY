@@ -22,13 +22,13 @@ class CrossModalAnalyzer:
             if optical_evidence.metrics.get("region_count", 0) == 0 and sar_evidence.metrics.get("region_count", 0) == 0:
                 return {
                     "relationship": EvidenceRelationship.AGREEMENT,
-                    "metrics": {"iou": 1.0, "intersection_area": 0.0},
+                    "metrics": {"bbox_iou": 1.0, "intersection_area": 0.0},
                     "explanation": "Both modalities report no significant regions.",
                     "provenance": ["AGREEMENT: Both optical and SAR detected 0 regions."]
                 }
             return {
                 "relationship": EvidenceRelationship.INCONCLUSIVE,
-                "metrics": {"iou": 0.0, "intersection_area": 0.0},
+                "metrics": {"bbox_iou": 0.0, "intersection_area": 0.0},
                 "explanation": "Insufficient spatial artifacts for comparison.",
                 "provenance": ["INCONCLUSIVE: No spatial regions returned by one or both modalities."]
             }
@@ -36,7 +36,7 @@ class CrossModalAnalyzer:
         if not optical_evidence.spatial_artifacts:
             return {
                 "relationship": EvidenceRelationship.DISAGREEMENT, # or COMPLEMENTARY based on context
-                "metrics": {"iou": 0.0, "intersection_area": 0.0},
+                "metrics": {"bbox_iou": 0.0, "intersection_area": 0.0},
                 "explanation": "SAR detected regions, but Optical detected none.",
                 "provenance": ["DISAGREEMENT: Optical regions=0, SAR regions>0."]
             }
@@ -44,7 +44,7 @@ class CrossModalAnalyzer:
         if not sar_evidence.spatial_artifacts:
             return {
                 "relationship": EvidenceRelationship.DISAGREEMENT,
-                "metrics": {"iou": 0.0, "intersection_area": 0.0},
+                "metrics": {"bbox_iou": 0.0, "intersection_area": 0.0},
                 "explanation": "Optical detected regions, but SAR detected none.",
                 "provenance": ["DISAGREEMENT: Optical regions>0, SAR regions=0."]
             }
@@ -66,26 +66,26 @@ class CrossModalAnalyzer:
             f"SAR geometry area (pixel squared): {sar_geom.area}",
             f"Intersection area: {intersection_area}",
             f"Union area: {union_area}",
-            f"IoU: {iou:.4f}"
+            f"Bounding Box IoU: {iou:.4f}"
         ]
 
         if iou > 0.1:
             relationship = EvidenceRelationship.AGREEMENT
-            explanation = "Significant spatial overlap exists between optical and SAR evidence regions."
-            provenance.append("AGREEMENT: IoU > 0.1")
+            explanation = "Significant spatial bounding-box overlap exists between optical and SAR evidence regions (Note: precise pixel mask comparison not implemented)."
+            provenance.append("AGREEMENT: BBox IoU > 0.1")
         elif iou > 0.0:
             relationship = EvidenceRelationship.COMPLEMENTARY
-            explanation = "Minor spatial overlap. Signals are largely adjacent or disjoint."
-            provenance.append("COMPLEMENTARY: 0 < IoU <= 0.1")
+            explanation = "Minor spatial bounding-box overlap. Signals are largely adjacent or disjoint."
+            provenance.append("COMPLEMENTARY: 0 < BBox IoU <= 0.1")
         else:
             relationship = EvidenceRelationship.DISAGREEMENT
             explanation = "Evidence regions are completely disjoint."
-            provenance.append("DISAGREEMENT: IoU == 0")
+            provenance.append("DISAGREEMENT: BBox IoU == 0")
 
         return {
             "relationship": relationship,
             "metrics": {
-                "iou": iou,
+                "bbox_iou": iou,
                 "intersection_area": intersection_area,
                 "optical_area": opt_geom.area,
                 "sar_area": sar_geom.area

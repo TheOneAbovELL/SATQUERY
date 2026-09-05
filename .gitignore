@@ -4,7 +4,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-backend/models/
+backend/models/models--*/
 backend/models_fallback/
 backend/data/rs_adaptation/raw/
 backend/data/rs_adaptation/processed/
@@ -15,10 +15,10 @@ backend/dummy_test.jpg
 backend/artifacts/
 backend/mock_data/
 backend/uploads/
-models/
-add_prov.py
-fix.py
-rewrite.py
+models/models--*/
+patch_validator.py
+patch_cross_modal.py
+patch_providers.py
 
 # Local environments and secrets
 .venv/

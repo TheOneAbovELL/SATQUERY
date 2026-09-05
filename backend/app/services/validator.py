@@ -63,17 +63,33 @@ class InputValidator:
                 semantics = {}
                 is_sar = False
                 
-                # Check tags for SAR hints
+                # Check tags and metadata for SAR hints
                 tags = src.tags()
                 tags_upper = {k.upper(): v.upper() if isinstance(v, str) else str(v).upper() for k, v in tags.items()}
-                if "SAR" in tags_upper.get("SENSOR", "") or "SENTINEL-1" in tags_upper.get("SENSOR", ""):
+                
+                # Broaden SAR checks based on typical metadata fields and filename
+                filename_upper = os.path.basename(filepath).upper()
+                if "SAR" in tags_upper.get("SENSOR", "") or "SENTINEL-1" in tags_upper.get("SENSOR", "") or "S1A" in filename_upper or "S1B" in filename_upper or "_SAR_" in filename_upper:
                     is_sar = True
                 
                 for i in range(1, src.count + 1):
                     # Check description first for polarization
                     desc = src.descriptions[i-1]
+                    # Sometimes polarization is in band tags rather than description
+                    band_tags = src.tags(i)
+                    band_tags_upper = {k.upper(): str(v).upper() for k, v in band_tags.items()}
+                    
+                    pol = None
                     if desc and desc.upper() in ["VV", "VH", "HH", "HV"]:
-                        semantics[i] = desc.upper()
+                        pol = desc.upper()
+                    else:
+                        for val in band_tags_upper.values():
+                            if val in ["VV", "VH", "HH", "HV"]:
+                                pol = val
+                                break
+                    
+                    if pol:
+                        semantics[i] = pol
                         is_sar = True
                     else:
                         ci = src.colorinterp[i-1].name.upper()

@@ -1,0 +1,48 @@
+{
+  "base_model": "Qwen/Qwen2-VL-2B-Instruct",
+  "adapter_type": "LoRA (PEFT)",
+  "lora_config": {
+    "r": 8,
+    "lora_alpha": 16,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj"
+    ],
+    "lora_dropout": 0.05,
+    "bias": "none",
+    "task_type": "CAUSAL_LM"
+  },
+  "training_config": {
+    "learning_rate": 0.0002,
+    "epochs": 3,
+    "batch_size": 1,
+    "gradient_accumulation_steps": 8,
+    "max_seq_length": 512,
+    "checkpoint_interval": 50,
+    "seed": 42,
+    "max_new_tokens_eval": 64,
+    "warmup_ratio": 0.1,
+    "lr": 0.0002
+  },
+  "dataset": {
+    "name": "UCM-Captions",
+    "source": "https://huggingface.co/datasets/cpratikaki/UCMcaptions_finetuning",
+    "license": "License/provenance requires verification. Original UCM dataset (Yang & Newsam 2010) is for academic use. Dataset accessed via HuggingFace. Do not claim a specific license without verification.",
+    "status": "READY",
+    "samples": 500,
+    "train": 450,
+    "val": 50
+  },
+  "hardware": {
+    "device": "cuda",
+    "cuda_available": true,
+    "note": "Trained on T4 GPU (Google Colab). Inference tested on CPU (Windows demo machine)."
+  },
+  "status": "FULL_ADAPTER_TRAINED",
+  "final_loss": 0.9084187559286754,
+  "training_duration_sec": 762.5930860042572,
+  "adapter_path": "models/rs_lora_adapter",
+  "created_at": "2026-09-05T03:11:29.771790+00:00"
+}

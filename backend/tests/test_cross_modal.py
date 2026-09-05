@@ -103,7 +103,7 @@ def test_cross_modal_agreement(tmp_fusion_rasters):
     
     assert res.success is True
     assert res.outputs["relationship"] == EvidenceRelationship.AGREEMENT
-    assert res.metrics["iou"] > 0.9  # Nearly perfect overlap (1.0 ideally)
+    assert res.metrics["bbox_iou"] > 0.9  # Nearly perfect bounding-box overlap (1.0 ideally)
 
 def test_cross_modal_disagreement(tmp_fusion_rasters):
     tool = CrossModalEvidenceTool(artifact_dir=tmp_fusion_rasters["artifacts"])
@@ -122,7 +122,7 @@ def test_cross_modal_disagreement(tmp_fusion_rasters):
     
     assert res.success is True
     assert res.outputs["relationship"] == EvidenceRelationship.DISAGREEMENT
-    assert res.metrics["iou"] == 0.0
+    assert res.metrics["bbox_iou"] == 0.0
 
 def test_cross_modal_complementary(tmp_fusion_rasters):
     tool = CrossModalEvidenceTool(artifact_dir=tmp_fusion_rasters["artifacts"])
@@ -140,7 +140,7 @@ def test_cross_modal_complementary(tmp_fusion_rasters):
     res = tool.execute(req, assets)
     
     assert res.success is True
-    # The regions are disjoint: optical at 20-40, SAR at 70-90. Thus IoU is 0. 
-    # Current logic maps IoU==0 to DISAGREEMENT since neither confirms the other.
+    # The regions are disjoint: optical at 20-40, SAR at 70-90. Thus bbox_iou is 0. 
+    # Current logic maps bbox_iou==0 to DISAGREEMENT since neither confirms the other.
     assert res.outputs["relationship"] == EvidenceRelationship.DISAGREEMENT
-    assert res.metrics["iou"] == 0.0
+    assert res.metrics["bbox_iou"] == 0.0

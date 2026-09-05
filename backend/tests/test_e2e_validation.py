@@ -221,10 +221,10 @@ def test_cross_modal_evidence():
     TIMINGS["cross_modal_fusion"] = elapsed
     assert res.success, f"Fusion failed: {res.error_message}"
     rel = res.outputs.get("relationship")
-    iou = res.metrics.get("iou", 0.0)
-    print(f"  relationship={rel} | iou={iou:.4f} | time={elapsed:.2f}s")
+    bbox_iou = res.metrics.get("bbox_iou", 0.0)
+    print(f"  relationship={rel} | bbox_iou={bbox_iou:.4f} | time={elapsed:.2f}s")
     assert rel == EvidenceRelationship.AGREEMENT, f"Expected AGREEMENT, got {rel}"
-    assert iou > 0.9, f"Expected iou~1.0, got {iou}"
+    assert bbox_iou > 0.9, f"Expected bbox_iou~1.0, got {bbox_iou}"
     RESULTS["cross_modal_evidence"] = "PASS"
 
 def test_numerical_grounding(known_changed_pixels=600):
