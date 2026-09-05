@@ -12,6 +12,13 @@ backend/data/rs_adaptation/train/
 backend/data/rs_adaptation/validation/
 backend/e2e_artifacts/
 backend/dummy_test.jpg
+backend/artifacts/
+backend/mock_data/
+backend/uploads/
+models/
+add_prov.py
+fix.py
+rewrite.py
 
 # Local environments and secrets
 .venv/

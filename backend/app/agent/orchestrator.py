@@ -18,7 +18,11 @@ class SatQueryAgent:
         available_tools = self.execution_service.registry.list_tools()
         
         # 2. Get Structured Plan
-        context = request.session_context
+        context_lines = ["Loaded Assets:"]
+        for a in loaded_assets:
+            context_lines.append(f"- {a.asset_id} (Modality: {a.modality.value})")
+        context = "\n".join(context_lines)
+        
         try:
             plan = self.llm_provider.generate_plan(request.query, context, available_tools)
         except Exception as e:

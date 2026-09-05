@@ -1,26 +1,104 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* ── SATQUERY Design Tokens ── */
+
+  /* Backgrounds */
+  --color-sq-bg:        #070c14;
+  --color-sq-surface:   #0d1626;
+  --color-sq-surface-2: #111d30;
+  --color-sq-surface-3: #162035;
+
+  /* Borders */
+  --color-sq-border:    #1e2d42;
+  --color-sq-border-2:  #243450;
+
+  /* Accent (active / AI) */
+  --color-sq-accent:    #00b4d8;
+  --color-sq-accent-dim:#0077a8;
+
+  /* Modality colours */
+  --color-sq-optical:   #4ade80;   /* green — optical evidence */
+  --color-sq-sar:       #f59e0b;   /* amber — SAR evidence */
+  --color-sq-change:    #f43f5e;   /* rose  — change detection */
+  --color-sq-fusion:    #a78bfa;   /* violet — cross-modal fusion */
+
+  /* Text */
+  --color-sq-text:      #dde6f0;
+  --color-sq-muted:     #64748b;
+  --color-sq-subtle:    #3d5166;
+
+  /* Status */
+  --color-sq-ok:        #22c55e;
+  --color-sq-warn:      #eab308;
+  --color-sq-error:     #ef4444;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--color-sq-bg);
+  color: var(--color-sq-text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-sq-border-2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-sq-subtle); }
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-sq-accent);
+  outline-offset: 2px;
+}
+
+/* Monospace utility for technical values */
+.sq-mono {
+  font-family: var(--font-geist-mono), 'Courier New', monospace;
+  letter-spacing: 0.03em;
+}
+
+/* Subtle scan-line texture on image canvas */
+.sq-scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 180, 216, 0.015) 3px,
+    rgba(0, 180, 216, 0.015) 4px
+  );
+}
+
+/* Evidence pulse animation */
+@keyframes sq-pulse-border {
+  0%, 100% { border-color: rgba(0, 180, 216, 0.4); }
+  50%       { border-color: rgba(0, 180, 216, 0.9); }
+}
+
+@keyframes sq-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sq-trace-appear {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.sq-fade-in {
+  animation: sq-fade-in 0.25s ease-out forwards;
+}
+
+.sq-trace-appear {
+  animation: sq-trace-appear 0.2s ease-out forwards;
 }

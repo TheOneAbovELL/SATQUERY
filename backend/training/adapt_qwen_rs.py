@@ -48,7 +48,7 @@ from typing import List, Dict, Any
 logger = logging.getLogger("satquery.adaptation")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-ROOT = Path(__file__).parent.parent  # backend/
+ROOT = Path(__file__).resolve().parent.parent.parent  # Repository root
 DATA_DIR = ROOT / "data" / "rs_adaptation"
 ADAPTER_DIR = ROOT / "models" / "rs_lora_adapter"
 MANIFEST_PATH = DATA_DIR / "metadata" / "manifest.jsonl"
@@ -60,73 +60,44 @@ TRAINING_MANIFEST_PATH = ADAPTER_DIR / "training_manifest.json"
 
 def prepare_dataset(max_samples: int = 500, seed: int = 42) -> Dict[str, Any]:
     """
-    Prepares a controlled subset from UCM-Captions (University of California
-    Merced Land Use dataset with human-written captions).
-
-    Dataset facts:
-      Name     : UCM-Captions
-      Source   : https://github.com/201528014227051/RSICD_optimal (subset)
-      License  : CC BY-NC-SA 4.0 (permissive for research adaptation)
-      Modality : Optical aerial imagery, 256×256 px, 0.3m/px
-      Classes  : 21 land-use categories (agriculture, forest, harbor, runway...)
-      Captions : 5 human-annotated captions per image (~2100 pairs)
-      Format   : JPEG images + JSON caption annotations
-
-    NOTE: This function builds the dataset MANIFEST and directory structure.
-    It does NOT automatically download the data to avoid uncontrolled bandwidth.
-    Download instructions are printed. If images are already present in
-    data/rs_adaptation/raw/, they are indexed automatically.
+    Prepares a controlled subset from UCM-Captions.
     """
+    if MANIFEST_PATH.exists() and MANIFEST_PATH.stat().st_size > 0:
+        logger.info(f"Using existing dataset manifest at {MANIFEST_PATH}")
+        records = load_manifest()
+        if records:
+            n_train = sum(1 for r in records if r.get("split") == "train")
+            n_val = len(records) - n_train
+            return {"status": "READY", "samples": len(records), "train": n_train, "val": n_val}
+
     (DATA_DIR / "raw").mkdir(parents=True, exist_ok=True)
     (DATA_DIR / "processed").mkdir(parents=True, exist_ok=True)
     (DATA_DIR / "train").mkdir(parents=True, exist_ok=True)
     (DATA_DIR / "validation").mkdir(parents=True, exist_ok=True)
     (DATA_DIR / "metadata").mkdir(parents=True, exist_ok=True)
 
-    # Check if images already exist
     raw_images = list((DATA_DIR / "raw").glob("**/*.jpg")) + \
                  list((DATA_DIR / "raw").glob("**/*.png")) + \
                  list((DATA_DIR / "raw").glob("**/*.tif"))
 
     if not raw_images:
         logger.warning("No images found in data/rs_adaptation/raw/")
-        logger.info("=" * 60)
-        logger.info("DATASET DOWNLOAD INSTRUCTIONS")
-        logger.info("=" * 60)
-        logger.info("Option A: UCM-Captions (recommended, CC BY-NC-SA 4.0)")
-        logger.info("  1. Download from: https://drive.google.com/file/d/0B1jt4ijlxQHJVkR0LXJ3dDdldWM")
-        logger.info("  2. Extract to: data/rs_adaptation/raw/UCM/")
-        logger.info("  3. Download captions JSON:")
-        logger.info("     https://github.com/201528014227051/RSICD_optimal")
-        logger.info("     Place dataset_ucm.json in data/rs_adaptation/raw/UCM/")
-        logger.info("")
-        logger.info("Option B: RSICD (larger, CC BY-NC-SA 4.0)")
-        logger.info("  1. https://github.com/201528014227051/RSICD_optimal")
-        logger.info("  2. Extract to: data/rs_adaptation/raw/RSICD/")
-        logger.info("=" * 60)
-
-        # Write an empty but valid manifest so the pipeline structure is verified
         manifest_meta = {
             "status": "DATA_PENDING",
             "dataset_name": "UCM-Captions",
-            "source": "https://github.com/201528014227051/RSICD_optimal",
-            "license": "CC BY-NC-SA 4.0",
+            "source": "cpratikaki/UCMcaptions_finetuning",
+            "license": "Unknown",
             "modality": "optical_aerial",
-            "instructions": "See download instructions above.",
             "samples_ready": 0
         }
-        (DATA_DIR / "metadata" / "manifest_meta.json").write_text(
-            json.dumps(manifest_meta, indent=2)
-        )
+        (DATA_DIR / "metadata" / "manifest_meta.json").write_text(json.dumps(manifest_meta, indent=2))
         MANIFEST_PATH.write_text("")
         return {"status": "DATA_PENDING", "samples": 0}
 
-    # Build manifest from existing images
     rng = random.Random(seed)
     all_records = []
 
     for img_path in raw_images:
-        # Try to find a matching caption JSON
         caption = _try_load_caption(img_path)
         if caption:
             all_records.append({
@@ -134,7 +105,7 @@ def prepare_dataset(max_samples: int = 500, seed: int = 42) -> Dict[str, Any]:
                 "text": caption,
                 "source_dataset": img_path.parent.name,
                 "modality": "optical_aerial",
-                "license": "CC BY-NC-SA 4.0"
+                "license": "Unknown"
             })
 
     rng.shuffle(all_records)
@@ -153,8 +124,8 @@ def prepare_dataset(max_samples: int = 500, seed: int = 42) -> Dict[str, Any]:
 
     meta = {
         "dataset_name": "UCM-Captions",
-        "source": "https://github.com/201528014227051/RSICD_optimal",
-        "license": "CC BY-NC-SA 4.0",
+        "source": "cpratikaki/UCMcaptions_finetuning",
+        "license": "Unknown",
         "modality": "optical_aerial",
         "total_samples": len(all_records),
         "train_samples": n_train,
@@ -321,17 +292,13 @@ def train(args):
     import torch
     import json
 
-    device = "cuda" if (torch.cuda.is_available() and args.mode == "full") else "cpu"
-    is_smoke = args.mode == "smoke"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if args.mode == "full" and device == "cpu":
+        logger.error("CUDA is required for full training mode. Aborting to prevent accidental CPU fallback.")
+        return
 
+    is_smoke = args.mode == "smoke"
     logger.info(f"Device: {device} | Mode: {args.mode}")
-    if device == "cpu" and not is_smoke:
-        logger.warning(
-            "FULL TRAINING ON CPU IS NOT PRACTICAL FOR LARGE MODELS.\n"
-            "This will be extremely slow. Consider running on a GPU machine.\n"
-            "Switching to smoke-test mode automatically."
-        )
-        is_smoke = True
 
     # Prep data
     data_status = prepare_dataset(max_samples=args.max_samples, seed=args.seed)
@@ -386,7 +353,7 @@ def train(args):
             if batch is None:
                 continue
 
-            batch = {k: v.to(device) for k, v in batch.items()}
+            batch = {k: v.to(device) if hasattr(v, "to") else v for k, v in batch.items()}
 
             outputs = model(**batch)
             loss = outputs.loss / train_cfg["gradient_accumulation_steps"]
@@ -402,7 +369,22 @@ def train(args):
                 logger.info(f"  Step {global_step} | loss={epoch_loss/n_steps:.4f}")
 
             if is_smoke:
+                # We need to manually step in smoke mode if accumulation hasn't triggered
+                if (i + 1) % train_cfg["gradient_accumulation_steps"] != 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    global_step += 1
+                    logger.info(f"  Step {global_step} (smoke) | loss={epoch_loss/n_steps:.4f}")
                 break  # Only one step in smoke mode
+
+        # Final step for remaining gradients at the end of epoch
+        if not is_smoke and len(train_records) % train_cfg["gradient_accumulation_steps"] != 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            optimizer.zero_grad()
+            global_step += 1
+            logger.info(f"  Step {global_step} (final of epoch {epoch+1}) | loss={epoch_loss/max(n_steps, 1):.4f}")
 
         final_loss = epoch_loss / max(n_steps, 1)
         logger.info(f"Epoch {epoch+1} complete | avg_loss={final_loss:.4f}")
@@ -431,8 +413,8 @@ def _write_training_manifest(args, data_status: dict, status: str,
                             "batch_size": args.batch_size, "seed": args.seed},
         "dataset": {
             "name": "UCM-Captions",
-            "source": "https://github.com/201528014227051/RSICD_optimal",
-            "license": "CC BY-NC-SA 4.0",
+            "source": "cpratikaki/UCMcaptions_finetuning",
+            "license": "Unknown",
             **data_status
         },
         "hardware": {

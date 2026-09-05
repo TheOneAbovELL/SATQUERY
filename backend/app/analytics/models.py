@@ -1,4 +1,9 @@
 import os
+from pathlib import Path
+
+# Repo root is three levels up from app/analytics/models.py
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_DEFAULT_ADAPTER_PATH = _REPO_ROOT / "models" / "rs_lora_adapter"
 from typing import Dict, Any, List
 from app.domain.models import ModelAdapterDefinition, AssetModality, ToolRequest, ToolResult, ImageAsset, ToolDefinition, ToolErrorCode
 from app.agent.interfaces import BaseModelAdapter, BaseTool
@@ -83,9 +88,10 @@ class Qwen2VLAdapter(BaseModelAdapter):
     Supports optional LoRA adapter for remote-sensing domain adaptation.
 
     Configuration:
-      QWEN_ADAPTER_PATH  env var  → path to trained LoRA adapter directory.
-      If set and valid, loads base + adapter (adapted inference).
-      If absent/invalid, loads base model only (standard inference).
+      QWEN_ADAPTER_PATH  env var  → override path to trained LoRA adapter directory.
+      Default              → <repo_root>/models/rs_lora_adapter (auto-detected).
+      If adapter directory contains adapter_config.json, loads base + adapter.
+      If absent/invalid, loads base model only (graceful fallback).
     """
     def __init__(self):
         definition = ModelAdapterDefinition(
@@ -108,7 +114,9 @@ class Qwen2VLAdapter(BaseModelAdapter):
         super().__init__(definition)
         self.model = None
         self.processor = None
-        self.adapter_path: str = os.environ.get("QWEN_ADAPTER_PATH", "")
+        # Prefer explicit env var; fall back to project-relative default
+        env_override = os.environ.get("QWEN_ADAPTER_PATH", "")
+        self.adapter_path: str = env_override if env_override else str(_DEFAULT_ADAPTER_PATH)
         self.adapter_loaded: bool = False
         self._adaptation_meta: Dict[str, Any] = {}
 

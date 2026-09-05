@@ -168,11 +168,12 @@ class TestAdapterConfiguration:
 
 class TestQwen2VLAdapterFallback:
     def test_inference_mode_base_when_no_adapter_path(self, monkeypatch):
-        """Without QWEN_ADAPTER_PATH, adapter reports base inference mode."""
+        """Without QWEN_ADAPTER_PATH env var, adapter defaults to project-relative path."""
         monkeypatch.delenv("QWEN_ADAPTER_PATH", raising=False)
-        from app.analytics.models import Qwen2VLAdapter
+        from app.analytics.models import Qwen2VLAdapter, _DEFAULT_ADAPTER_PATH
         adapter = Qwen2VLAdapter()
-        assert adapter.adapter_path == ""
+        # adapter_path should be the project-relative default (not empty string)
+        assert adapter.adapter_path == str(_DEFAULT_ADAPTER_PATH)
         assert adapter.adapter_loaded is False
         assert adapter.inference_mode == "Qwen2-VL-2B base"
 
@@ -331,3 +332,16 @@ class TestAdapterProvenance:
         assert data["status"] == "DATA_PENDING"
         assert data["final_loss"] is None  # Must NOT fabricate a loss
         assert data["base_model"] == "Qwen/Qwen2-VL-2B-Instruct"
+
+
+class TestPathResolution:
+    def test_repo_root_paths_are_correct(self):
+        import training.adapt_qwen_rs as pipeline
+        from pathlib import Path
+        
+        # ROOT should be the repo root (SATQUERY)
+        assert pipeline.ROOT.name == 'SATQUERY' or pipeline.ROOT.name == 'SATQUERY-main', f'Expected repo root, got {pipeline.ROOT.name}'
+        
+        # Paths should be under ROOT
+        assert pipeline.DATA_DIR == pipeline.ROOT / 'data' / 'rs_adaptation'
+        assert pipeline.MANIFEST_PATH == pipeline.ROOT / 'data' / 'rs_adaptation' / 'metadata' / 'manifest.jsonl'
