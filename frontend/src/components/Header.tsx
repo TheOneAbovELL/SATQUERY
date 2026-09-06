@@ -3,32 +3,99 @@ import React, { useEffect, useState } from "react";
 import { useWorkspace } from "../lib/store";
 import { checkHealth } from "../lib/api";
 
+const MODE_LABELS: Record<string, string> = {
+  EMPTY: '',
+  SINGLE: 'SINGLE IMAGE',
+  BITEMPORAL: 'BI-TEMPORAL',
+  SAR_ONLY: 'SAR MODE',
+  CROSS_MODAL: 'CROSS-MODAL',
+};
+
+const MODE_COLORS: Record<string, string> = {
+  SINGLE: 'var(--color-sq-optical)',
+  BITEMPORAL: 'var(--color-sq-change)',
+  SAR_ONLY: 'var(--color-sq-sar)',
+  CROSS_MODAL: 'var(--color-sq-fusion)',
+};
+
 export function Header() {
   const { state } = useWorkspace();
   const [online, setOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
-    checkHealth().then(() => setOnline(true)).catch(() => setOnline(false));
+    checkHealth()
+      .then(() => setOnline(true))
+      .catch(() => setOnline(false));
   }, []);
 
+  const mode = state.workspaceMode;
+  const modeLabel = MODE_LABELS[mode] || '';
+  const modeColor = MODE_COLORS[mode] || 'var(--color-sq-muted)';
+
   return (
-    <div className="flex items-center justify-between px-4 w-full h-[44px] shrink-0" style={{ borderBottom: "1px solid var(--color-sq-border)", background: "var(--color-sq-bg)" }}>
-      <div className="flex items-center gap-2">
-        <span className="font-bold tracking-widest text-sm" style={{ color: "var(--color-sq-accent)" }}>SATQUERY</span>
-        <span style={{ color: "var(--color-sq-subtle)" }}>|</span>
-        <span className="text-xs tracking-wider" style={{ color: "var(--color-sq-muted)" }}>AI</span>
+    <div
+      className="relative flex items-center justify-between px-6 w-full shrink-0"
+      style={{
+        height: '48px',
+        borderBottom: '1px solid var(--color-sq-border)',
+        background: 'rgba(5,5,7,0.95)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
+      {/* Tricolor top accent — 1px, 25% opacity */}
+      <div
+        className="absolute top-0 left-0 w-full h-[1px] sq-tricolor-line pointer-events-none"
+        style={{ opacity: 0.22 }}
+      />
+
+      {/* Left: Wordmark */}
+      <div className="flex items-center gap-2.5">
+        {/* Tricolor logo mark */}
+        <div
+          className="w-2 h-2 rounded-sm"
+          style={{ background: 'linear-gradient(135deg, #FF9933 0%, #F4F4F2 50%, #138808 100%)' }}
+        />
+        <span className="text-sm font-bold tracking-[0.22em]" style={{ color: 'var(--color-sq-text)' }}>
+          SATQUERY
+        </span>
+        <span className="text-xs font-light tracking-[0.1em]" style={{ color: 'var(--color-sq-subtle)' }}>
+          AI
+        </span>
       </div>
-      <div className="flex items-center justify-center flex-1">
-        {state.workspaceMode !== "EMPTY" && (
-          <div className="px-2 py-0.5 text-[10px] font-semibold tracking-wider rounded border" style={{ borderColor: "var(--color-sq-border)", color: "var(--color-sq-text)" }}>
-            {state.workspaceMode.replace("_", " ")}
+
+      {/* Center: Workspace mode badge */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+        {modeLabel && (
+          <div
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full border"
+            style={{
+              borderColor: 'var(--color-sq-border-2)',
+              background: 'rgba(255,255,255,0.02)',
+            }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: modeColor }} />
+            <span className="text-[10px] font-semibold tracking-[0.15em]" style={{ color: 'var(--color-sq-muted)' }}>
+              {modeLabel}
+            </span>
           </div>
         )}
       </div>
-      <div className="flex items-center gap-2 text-[10px] tracking-wider">
-        <div className="w-1.5 h-1.5 rounded-full" style={{ background: online ? "var(--color-sq-ok)" : "var(--color-sq-error)" }} />
-        <span style={{ color: online ? "var(--color-sq-ok)" : "var(--color-sq-error)" }}>
-          {online === null ? "CHECKING..." : online ? "BACKEND ONLINE" : "BACKEND OFFLINE"}
+
+      {/* Right: System status */}
+      <div className="flex items-center gap-2">
+        <div
+          className="w-1.5 h-1.5 rounded-full"
+          style={{
+            background: online ? 'var(--color-sq-ok)' : online === false ? 'var(--color-sq-error)' : 'var(--color-sq-subtle)',
+            boxShadow: online ? '0 0 4px var(--color-sq-ok)' : 'none',
+          }}
+        />
+        <span
+          className="text-[10px] font-mono tracking-[0.12em]"
+          style={{ color: online === false ? 'var(--color-sq-error)' : 'var(--color-sq-subtle)' }}
+        >
+          {online === null ? 'CHECKING' : online ? 'SYSTEM ONLINE' : 'BACKEND OFFLINE'}
         </span>
       </div>
     </div>
