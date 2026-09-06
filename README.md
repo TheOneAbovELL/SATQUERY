@@ -57,15 +57,15 @@ SatQuery is intended to feel like **“ChatGPT for satellite imagery, with speci
 
 The web experience uses a dark, space-inspired visual language with bright satellite imagery, subtle gradients, and compact mission-control styling.
 
-### Landing page mockup
+### Loading page / landing page
 
-This first mockup is the product landing page: a cinematic Earth background, strong headline, product positioning, and the primary **Start Analyzing** call to action. It frames SatQuery AI as a geospatial intelligence assistant for understanding Earth from imagery.
+This first screen is the loading/landing page: a cinematic Earth background, bold mission statement, and a primary **Start Analyzing** call to action. It presents SatQuery AI as an Earth intelligence assistant that turns satellite imagery into actionable insights.
 
-![SatQuery AI landing page](./frontend/public/earth-hero.jpg)
+![SatQuery AI loading page](./frontend/public/earth-hero.jpg)
 
-### Chat interface mockup
+### Chat interface
 
-This second mockup represents the chat interface used after the landing page. It keeps the dark mission-control aesthetic, centers the conversation on imagery and prompts, and shows how an analyst can upload an image, ask a question, and work from a guided chat-style workflow.
+This second screen is the chat interface used after the landing page. It keeps the dark mission-control aesthetic, centers the conversation on imagery and prompts, and shows the workspace flow for uploading an image and asking geospatial questions.
 
 ![SatQuery AI chat interface](./frontend/public/chat-bg.jpg)
 
