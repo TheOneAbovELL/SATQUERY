@@ -31,7 +31,8 @@ type Action =
   | { type: 'SET_RESULT'; payload: AnalysisResult }
   | { type: 'SET_ERROR'; payload: string }
   | { type: 'SET_ACTIVE_LAYER'; payload: ActiveLayer }
-  | { type: 'RESET_ANALYSIS' };
+  | { type: 'RESET_ANALYSIS' }
+  | { type: 'FULL_RESET' };
 
 const initialState: WorkspaceState = {
   scenes: [],
@@ -104,6 +105,7 @@ function workspaceReducer(state: WorkspaceState, action: Action): WorkspaceState
     }
     case 'SET_ACTIVE_LAYER': return { ...state, activeLayer: action.payload };
     case 'RESET_ANALYSIS': return { ...state, result: null, error: null, phase: 'idle', history: [] };
+    case 'FULL_RESET': return { ...initialState };
     default: return state;
   }
 }

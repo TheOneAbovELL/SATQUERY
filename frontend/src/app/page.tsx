@@ -13,20 +13,15 @@ export default function SatQueryAI() {
 
   const handleEnter = useCallback(() => {
     setAppState("exiting");
-    // After exit animation (500ms), show workspace
-    setTimeout(() => {
-      setAppState("workspace");
-    }, 480);
+    setTimeout(() => setAppState("workspace"), 480);
   }, []);
 
   return (
     <WorkspaceProvider>
-      {/* Landing overlay — rendered on top until dismissed */}
       {appState !== "workspace" && (
         <LandingHero onEnter={handleEnter} isExiting={appState === "exiting"} />
       )}
 
-      {/* Workspace — always mounted, revealed after transition */}
       <div
         className={`flex flex-col w-full h-full overflow-hidden ${
           appState === "workspace" ? "sq-workspace-enter" : "opacity-0 pointer-events-none"
@@ -34,16 +29,25 @@ export default function SatQueryAI() {
         style={{ background: "var(--color-sq-bg)" }}
       >
         <Header />
+
+        {/* Main workspace — no hard grid borders, panels float with subtle separators */}
         <div className="flex flex-1 overflow-hidden">
           <ScenePanel />
-          <div className="flex flex-col flex-1 overflow-hidden relative">
+
+          {/* Centre column */}
+          <div
+            className="flex flex-col flex-1 overflow-hidden relative"
+            style={{
+              borderLeft: "1px solid rgba(255,255,255,0.04)",
+              borderRight: "1px solid rgba(255,255,255,0.04)",
+            }}
+          >
             <AnalysisPanel />
             <QueryBar />
           </div>
-          <div
-            className="w-[440px] shrink-0 border-l flex flex-col"
-            style={{ borderColor: "var(--color-sq-border)" }}
-          >
+
+          {/* Right imagery column */}
+          <div className="w-[420px] shrink-0 flex flex-col">
             <ImageCanvas />
           </div>
         </div>

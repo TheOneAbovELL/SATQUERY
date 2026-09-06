@@ -60,6 +60,55 @@ function sanitizeAISummary(raw: string): string {
   return raw; // fallback — return as-is
 }
 
+/**
+ * SAR Plain-Language Enricher — display layer only, backend untouched.
+ *
+ * Detects SAR technical metrics (backscatter dB values, percentiles) in the
+ * raw summary and prepends a human-readable "What this means" callout so that
+ * any user (not just radar experts) can understand the result.
+ */
+function enrichSARSummary(raw: string): string {
+  if (!raw) return raw;
+
+  // Check if this looks like a SAR result
+  const hasSARTerms = /backscatter|dB|decibel|percentile|sigma.?nought|coherence|polarisation|polarization/i.test(raw);
+  if (!hasSARTerms) return raw;
+
+  // Extract dB numbers from the text to build context
+  const dbMatches = [...raw.matchAll(/([-\d.]+)\s*dB/gi)];
+  if (dbMatches.length === 0) return raw;
+
+  const dbValues = dbMatches.map(m => parseFloat(m[1])).filter(v => !isNaN(v));
+  const avgDb = dbValues.find((_, i) => /average|mean/i.test(dbMatches[i]?.input?.slice(Math.max(0, (dbMatches[i]?.index ?? 0) - 30), dbMatches[i]?.index ?? 0) ?? ''));
+  const peakDb = dbValues.find((_, i) => /peak|percentile|max/i.test(dbMatches[i]?.input?.slice(Math.max(0, (dbMatches[i]?.index ?? 0) - 30), dbMatches[i]?.index ?? 0) ?? ''));
+
+  // Interpret average backscatter
+  function interpretAvgDb(db: number): string {
+    if (db < -20) return 'very smooth surfaces like calm water or bare flat ground — almost no radar signal reflected back';
+    if (db < -10) return 'smooth or lightly textured surfaces such as agricultural fields, grasslands, or roads';
+    if (db < 0)  return 'moderately rough surfaces typical of vegetation, shrubland, or mixed land cover';
+    if (db < 10) return 'rough terrain, dense vegetation, or urban areas with significant radar reflection';
+    return 'highly reflective surfaces — likely dense urban areas, metal structures, or very rough terrain';
+  }
+
+  // Interpret peak backscatter
+  function interpretPeakDb(db: number): string {
+    if (db < 0)   return 'moderate peak reflections — no unusually bright targets detected';
+    if (db < 15)  return 'some bright targets, possibly vehicles, small buildings, or exposed rock faces';
+    if (db < 30)  return 'strong bright targets — likely metallic structures, rooftops, or corner reflectors';
+    return 'very strong bright targets — likely large metal structures, ships, infrastructure, or man-made corner reflections';
+  }
+
+  const avgLine  = avgDb  !== undefined ? `**Average signal:** ${avgDb.toFixed(1)} dB — ${interpretAvgDb(avgDb)}` : '';
+  const peakLine = peakDb !== undefined ? `**Brightest point:** ${peakDb.toFixed(1)} dB — ${interpretPeakDb(peakDb)}` : '';
+
+  const lines = [avgLine, peakLine].filter(Boolean).join('\n\n');
+
+  const plainBlock = `> **📡 In plain language:**\n>\n${lines.split('\n').map(l => `> ${l}`).join('\n')}\n\n---\n\n`;
+
+  return plainBlock + raw;
+}
+
 export function AnalysisPanel() {
   const { state, dispatch } = useWorkspace();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -146,19 +195,94 @@ export function AnalysisPanel() {
           </div>
         ) : (
           /* ── Conversation ── */
-          <div className="p-6 md:p-8 space-y-8">
+          <div className="flex flex-col h-full">
+            {/* Sticky action bar */}
+            <div
+              className="flex items-center justify-between px-5 py-2 shrink-0"
+              style={{
+                background: 'rgba(5,5,7,0.80)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                borderBottom: '1px solid rgba(255,255,255,0.045)',
+              }}
+            >
+              <span
+                className="text-[9px] font-semibold tracking-[0.24em] uppercase"
+                style={{ color: 'rgba(255,255,255,0.2)' }}
+              >
+                Conversation
+              </span>
+              <div className="flex items-center gap-1.5">
+                {/* Clear chat — keeps scenes loaded */}
+                <button
+                  onClick={() => dispatch({ type: 'RESET_ANALYSIS' })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium transition-all duration-200"
+                  style={{
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    color: 'rgba(255,255,255,0.35)',
+                    cursor: 'pointer',
+                    background: 'transparent',
+                  }}
+                  title="Clear chat history but keep uploaded images"
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.65)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)';
+                  }}
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 .49-3.51"></path>
+                  </svg>
+                  Clear
+                </button>
+                {/* New Analysis — clears everything */}
+                <button
+                  onClick={() => dispatch({ type: 'FULL_RESET' })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium transition-all duration-200"
+                  style={{
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.55)',
+                    cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.03)',
+                  }}
+                  title="Start fresh — removes all uploaded images and conversation"
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.55)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)';
+                  }}
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  New Analysis
+                </button>
+              </div>
+            </div>
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
             {state.history.map((item) => (
               <div key={item.id} className="flex flex-col gap-5 sq-fade-in">
-                {/* User query bubble */}
+                {/* User query bubble — pill-style */}
                 <div className="flex justify-end">
                   <div
-                    className="max-w-[78%] px-5 py-4 rounded-2xl rounded-tr-sm"
+                    className="max-w-[78%] px-5 py-3.5 rounded-3xl"
                     style={{
-                      background: "rgba(255,255,255,0.035)",
-                      border: "1px solid var(--color-sq-border-2)",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.09)",
+                      backdropFilter: 'blur(4px)',
                     }}
                   >
-                    <p className="text-[14px] font-light leading-relaxed" style={{ color: "var(--color-sq-text)" }}>
+                    <p className="text-[14px] font-light leading-relaxed" style={{ color: "rgba(255,255,255,0.85)" }}>
                       {item.query}
                     </p>
                   </div>
@@ -180,12 +304,14 @@ export function AnalysisPanel() {
                 {item.result && (
                   <div className="flex justify-start">
                     <div className="flex flex-col gap-5 w-full max-w-[90%]">
-                      {/* Response bubble */}
+                      {/* Response bubble — frosted glass */}
                       <div
-                        className="relative p-6 md:p-7 rounded-2xl rounded-tl-sm overflow-hidden"
+                        className="relative p-6 md:p-7 rounded-3xl overflow-hidden"
                         style={{
-                          background: "var(--color-sq-surface)",
-                          border: "1px solid var(--color-sq-border)",
+                          background: "rgba(255,255,255,0.025)",
+                          border: "1px solid rgba(255,255,255,0.07)",
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
                         }}
                       >
                         {/* Subtle top left glow */}
@@ -239,7 +365,7 @@ export function AnalysisPanel() {
                               ),
                             }}
                           >
-                            {sanitizeAISummary(item.result.summary)}
+                            {enrichSARSummary(sanitizeAISummary(item.result.summary))}
                           </ReactMarkdown>
                         </div>
                       </div>
@@ -270,6 +396,7 @@ export function AnalysisPanel() {
               </div>
             ))}
             <div ref={bottomRef} />
+          </div>
           </div>
         )}
       </div>
