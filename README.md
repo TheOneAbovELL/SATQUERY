@@ -53,6 +53,28 @@ rather than asking a language model to invent spatial measurements.
 
 SatQuery is intended to feel like **“ChatGPT for satellite imagery, with specialist remote-sensing tools behind it.”**
 
+## 🖥️ Web Page Preview
+
+The web experience uses a dark, space-inspired visual language with bright satellite imagery, subtle gradients, and compact mission-control styling.
+
+### Landing page
+
+The landing page presents SatQuery AI as an assistant for understanding Earth from imagery. It includes the primary **Start Analyzing** call to action, a concise product description, and capability highlights for natural-language queries, multimodal analysis, change detection, and evidence-backed answers.
+
+![SatQuery AI landing page background](./frontend/public/earth-hero.jpg)
+
+### Analysis workspace
+
+After entering the workspace, users see a three-part layout:
+
+- **Left panel:** workspace navigation, image upload, and analysis tools for optical, SAR, change-detection, and multimodal workflows.
+- **Center panel:** the imagery canvas, welcome state, suggested questions, and natural-language query bar.
+- **Right panel:** contextual scene information, evidence, and analysis results once imagery is uploaded.
+
+The interface keeps the imagery and question at the center of the workflow while preserving clear system status and execution feedback.
+
+![SatQuery AI analysis workspace background](./frontend/public/chat-bg.jpg)
+
 A typical analyst workflow is:
 
 ```text
