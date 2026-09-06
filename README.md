@@ -57,23 +57,17 @@ SatQuery is intended to feel like **“ChatGPT for satellite imagery, with speci
 
 The web experience uses a dark, space-inspired visual language with bright satellite imagery, subtle gradients, and compact mission-control styling.
 
-### Landing page
+### Landing page mockup
 
-The landing page presents SatQuery AI as an assistant for understanding Earth from imagery. It includes the primary **Start Analyzing** call to action, a concise product description, and capability highlights for natural-language queries, multimodal analysis, change detection, and evidence-backed answers.
+This first mockup is the product landing page: a cinematic Earth background, strong headline, product positioning, and the primary **Start Analyzing** call to action. It frames SatQuery AI as a geospatial intelligence assistant for understanding Earth from imagery.
 
-![SatQuery AI landing page background](./frontend/public/earth-hero.jpg)
+![SatQuery AI landing page](./frontend/public/earth-hero.jpg)
 
-### Analysis workspace
+### Chat interface mockup
 
-After entering the workspace, users see a three-part layout:
+This second mockup represents the chat interface used after the landing page. It keeps the dark mission-control aesthetic, centers the conversation on imagery and prompts, and shows how an analyst can upload an image, ask a question, and work from a guided chat-style workflow.
 
-- **Left panel:** workspace navigation, image upload, and analysis tools for optical, SAR, change-detection, and multimodal workflows.
-- **Center panel:** the imagery canvas, welcome state, suggested questions, and natural-language query bar.
-- **Right panel:** contextual scene information, evidence, and analysis results once imagery is uploaded.
-
-The interface keeps the imagery and question at the center of the workflow while preserving clear system status and execution feedback.
-
-![SatQuery AI analysis workspace background](./frontend/public/chat-bg.jpg)
+![SatQuery AI chat interface](./frontend/public/chat-bg.jpg)
 
 A typical analyst workflow is:
 
