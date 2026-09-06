@@ -63,11 +63,6 @@ This first screen is the loading/landing page: a cinematic Earth background, bol
 
 ![SatQuery AI loading page](./docs/assets/landing-page.png)
 
-### Chat interface
-
-This second screen is the chat interface used after the landing page. It keeps the dark mission-control aesthetic, centers the conversation on imagery and prompts, and shows the workspace flow for uploading an image and asking geospatial questions.
-
-![SatQuery AI chat interface](./docs/assets/workspace.png)
 
 A typical analyst workflow is:
 
