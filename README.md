@@ -61,13 +61,13 @@ The web experience uses a dark, space-inspired visual language with bright satel
 
 This first screen is the loading/landing page: a cinematic Earth background, bold mission statement, and a primary **Start Analyzing** call to action. It presents SatQuery AI as an Earth intelligence assistant that turns satellite imagery into actionable insights.
 
-![SatQuery AI loading page](./frontend/public/earth-hero.jpg)
+![SatQuery AI loading page](./docs/assets/landing-page.png)
 
 ### Chat interface
 
 This second screen is the chat interface used after the landing page. It keeps the dark mission-control aesthetic, centers the conversation on imagery and prompts, and shows the workspace flow for uploading an image and asking geospatial questions.
 
-![SatQuery AI chat interface](./frontend/public/chat-bg.jpg)
+![SatQuery AI chat interface](./docs/assets/workspace.png)
 
 A typical analyst workflow is:
 
